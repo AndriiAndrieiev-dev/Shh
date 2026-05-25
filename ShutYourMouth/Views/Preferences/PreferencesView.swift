@@ -2,9 +2,9 @@
 //  PreferencesView.swift
 //  Shut Your Mouth
 //
-//  Hosted by the SwiftUI `Settings` scene. Phase 2 ships a single slider for
-//  popover transparency; Phase 6 will grow this into the full preferences UI
-//  (launch at login, HUD options, hotkey binding, mode, sleep auto-mute…).
+//  Preferences window content. Phase 3b adds the Hotkey & Mode section on
+//  top of the popover transparency slider; Phase 6 will round it out with
+//  launch-at-login, HUD options, auto-mute-on-sleep, and permission status.
 //
 
 import SwiftUI
@@ -14,39 +14,86 @@ struct PreferencesView: View {
 
     var body: some View {
         Form {
-            Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Background")
-                        Spacer()
-                        Text(materialName(for: preferences.popoverTintLevel))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Slider(
-                        value: $preferences.popoverTintLevel,
-                        in: 0...1
-                    ) {
-                        Text("Popover background")
-                    } minimumValueLabel: {
-                        Image(systemName: "circle.dotted")
-                            .foregroundStyle(.secondary)
-                    } maximumValueLabel: {
-                        Image(systemName: "circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text("Slide left for a strongly see-through Liquid-Glass look; slide right for a more opaque panel that stays readable on bright wallpapers.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Popover appearance")
-            }
+            hotkeySection
+            popoverSection
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 240)
+        .frame(width: 500, height: 380)
+    }
+
+    // MARK: - Hotkey & mode
+
+    private var hotkeySection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Hotkey")
+                    Spacer()
+                    HotkeyRecorderView(binding: $preferences.hotkey)
+                        .frame(width: 220)
+                }
+
+                Picker("Mode", selection: $preferences.toggleMode) {
+                    ForEach(ToggleMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text(modeHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Hotkey & mode")
+        }
+    }
+
+    private var modeHint: String {
+        switch preferences.toggleMode {
+        case .toggle:
+            return "Press the hotkey once to switch between muted and unmuted."
+        case .pushToTalkHoldToMute:
+            return "Mic is on by default. Hold the hotkey to mute (e.g. for a quick cough or sneeze); release to unmute."
+        case .pushToTalkHoldToTalk:
+            return "Mic is muted by default. Hold the hotkey to talk (walkie-talkie); release to mute."
+        }
+    }
+
+    // MARK: - Popover appearance
+
+    private var popoverSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Background")
+                    Spacer()
+                    Text(materialName(for: preferences.popoverTintLevel))
+                        .foregroundStyle(.secondary)
+                }
+
+                Slider(
+                    value: $preferences.popoverTintLevel,
+                    in: 0...1
+                ) {
+                    Text("Popover background")
+                } minimumValueLabel: {
+                    Image(systemName: "circle.dotted")
+                        .foregroundStyle(.secondary)
+                } maximumValueLabel: {
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Slide left for a strongly see-through Liquid-Glass look; slide right for a more opaque panel that stays readable on bright wallpapers.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Popover appearance")
+        }
     }
 
     private func materialName(for level: Double) -> String {

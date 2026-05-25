@@ -2,19 +2,20 @@
 //  HotkeyManager.swift
 //  Shut Your Mouth
 //
-//  Phase 3a — global keyboard hotkey to toggle mute system-wide.
+//  Global keyboard hotkey via CGEventTap at session level. Reads the binding
+//  from PreferencesStore — `HotkeyBinding` (keyCode + modifier mask).
 //
-//  Uses CGEventTap at the session level so we can capture the key BEFORE
-//  any application sees it (necessary for system-reserved F-row keys like
-//  F4/Launchpad on default MacBook keyboards). Requires Accessibility
-//  permission — we trigger the native system alert via
-//  `AXIsProcessTrustedWithOptions(prompt: true)` on first launch, after
-//  which the user has to enable the app under System Settings → Privacy &
-//  Security → Accessibility and restart the app.
+//  Fires two callbacks:
+//    - `onKeyDown` — fired once per press (auto-repeat filtered out)
+//    - `onKeyUp`   — fired on release
 //
-//  Phase 3b will add:
-//    - PTT (push-to-talk) keyDown + keyUp handling
-//    - Configurable hotkey binding (currently hardcoded F4)
+//  The mode (toggle vs push-to-talk) lives outside this class: AppDelegate
+//  wires these callbacks into AudioDeviceManager according to the current
+//  `ToggleMode` in PreferencesStore.
+//
+//  Requires Accessibility permission. We trigger the native consent alert
+//  via `AXIsProcessTrustedWithOptions(prompt: true)` on first launch; the
+//  user must grant the permission in System Settings and relaunch.
 //
 
 import AppKit
@@ -26,36 +27,40 @@ final class HotkeyManager: @unchecked Sendable {
 
     private let log = Logger(subsystem: "com.andrieiev.shutyourmouth", category: "HotkeyManager")
 
-    /// Hardcoded for Phase 3a — F4 (kVK_F4 = 0x76), the same default MuteKey
-    /// uses. Will be replaced by `PreferencesStore.hotkey` in Phase 3b.
-    private let targetKeyCode: CGKeyCode = 0x76
+    /// Current binding. Mutated only on the main thread; read from both main
+    /// and the CGEventTap callback thread (the latter without synchronization
+    /// — a stale read for one cycle is harmless).
+    private var binding: HotkeyBinding = .defaultF4
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
-    /// Fired on each non-repeat keyDown of the bound hotkey. Wired by
-    /// `AppDelegate` to `AudioDeviceManager.toggleMuteAll`.
-    @MainActor var onHotkeyToggle: (() -> Void)?
+    /// Fired on a fresh (non-autorepeat) keyDown of the bound hotkey.
+    @MainActor var onKeyDown: (() -> Void)?
+
+    /// Fired on keyUp of the bound hotkey.
+    @MainActor var onKeyUp: (() -> Void)?
 
     private init() {}
 
     // MARK: - Public API
 
     @MainActor
-    func start() {
-        guard eventTap == nil else { return }
+    func start(binding: HotkeyBinding) {
+        self.binding = binding
 
-        // Triggers the native macOS Accessibility consent alert if permission
-        // hasn't been granted yet. The app will need to be relaunched after
-        // the user enables it in System Settings; we'll detect that on the
-        // next launch.
-        let trusted = ensureAccessibilityPermission()
-        guard trusted else {
+        guard eventTap == nil else { return }
+        guard ensureAccessibilityPermission() else {
             log.warning("Accessibility permission missing — hotkey disabled. User must enable in System Settings → Privacy & Security → Accessibility and relaunch.")
             return
         }
-
         installEventTap()
+    }
+
+    @MainActor
+    func updateBinding(_ binding: HotkeyBinding) {
+        self.binding = binding
+        log.info("Hotkey rebound to \(binding.displayString, privacy: .public)")
     }
 
     @MainActor
@@ -99,15 +104,14 @@ final class HotkeyManager: @unchecked Sendable {
 
         self.eventTap = tap
         self.runLoopSource = source
-        log.info("HotkeyManager started — listening for F4 (keyCode \(self.targetKeyCode))")
+        log.info("HotkeyManager started — listening for \(self.binding.displayString, privacy: .public)")
     }
 
     @discardableResult
     private func ensureAccessibilityPermission() -> Bool {
         // `kAXTrustedCheckOptionPrompt` is a CFString global the Swift 6
-        // concurrency checker refuses to import. The underlying value is the
-        // literal string below; hardcoding it avoids needing
-        // `nonisolated(unsafe)` wrappers.
+        // concurrency checker refuses to import; its underlying value is the
+        // literal string below.
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
@@ -123,8 +127,7 @@ final class HotkeyManager: @unchecked Sendable {
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        // The system can disable our tap (timeout or user input flood). Re-arm
-        // it so we keep working without requiring an app restart.
+        // Re-arm tap if the system disabled it (timeout / user-input flood).
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             DispatchQueue.main.async { [weak self] in
                 if let tap = self?.eventTap {
@@ -138,8 +141,10 @@ final class HotkeyManager: @unchecked Sendable {
             return Unmanaged.passRetained(event)
         }
 
-        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-        guard keyCode == targetKeyCode else {
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let currentModifiers = event.flags.rawValue & HotkeyBinding.modifierMask
+
+        guard keyCode == binding.keyCode && currentModifiers == binding.modifiers else {
             return Unmanaged.passRetained(event)
         }
 
@@ -147,13 +152,17 @@ final class HotkeyManager: @unchecked Sendable {
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             if !isRepeat {
                 DispatchQueue.main.async { [weak self] in
-                    self?.onHotkeyToggle?()
+                    self?.onKeyDown?()
                 }
+            }
+        } else if type == .keyUp {
+            DispatchQueue.main.async { [weak self] in
+                self?.onKeyUp?()
             }
         }
 
-        // Suppress the event so default system handlers (Launchpad on F4) don't
-        // also fire. This is the whole point of `.headInsertEventTap`.
+        // Suppress the original event so the system / focused app doesn't
+        // also react (e.g. F4 → Launchpad).
         return nil
     }
 }
