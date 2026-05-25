@@ -17,5 +17,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController = MenuBarController()
+
+        // Wire global hotkey (F4) → toggle mute on all controllable input
+        // devices. Triggers the native Accessibility consent alert on first
+        // launch via AXIsProcessTrustedWithOptions(prompt: true).
+        HotkeyManager.shared.onHotkeyToggle = {
+            AudioDeviceManager.shared.toggleMuteAll()
+        }
+        HotkeyManager.shared.start()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        HotkeyManager.shared.stop()
     }
 }
