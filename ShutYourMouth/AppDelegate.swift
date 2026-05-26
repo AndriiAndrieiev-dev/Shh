@@ -24,10 +24,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Triggers the native Accessibility consent alert on first launch if
         // the permission hasn't been granted yet.
         HotkeyManager.shared.start(binding: PreferencesStore.shared.hotkey)
+
+        // Auto-mute when the Mac is about to sleep (respects autoMuteOnSleep).
+        SleepObserver.shared.start()
+
+        // Sync the live launch-at-login status into LaunchAtLoginManager
+        // (the user might have toggled it in System Settings while we were
+        // not running).
+        LaunchAtLoginManager.shared.refresh()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         HotkeyManager.shared.stop()
+        SleepObserver.shared.stop()
     }
 
     // MARK: - Hotkey ↔ Audio wiring

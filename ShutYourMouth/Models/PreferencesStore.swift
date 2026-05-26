@@ -26,6 +26,7 @@ final class PreferencesStore: ObservableObject {
         static let hudHorizontalAlignment = "hudHorizontalAlignment"
         static let hudVerticalAlignment = "hudVerticalAlignment"
         static let hudSize = "hudSize"
+        static let autoMuteOnSleep = "autoMuteOnSleep"
     }
 
     /// Popover background tint level in [0, 1].
@@ -88,6 +89,14 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// Mute every controllable input device when the Mac is about to sleep.
+    /// On wake we deliberately do NOT auto-unmute — the user stays in control.
+    @Published var autoMuteOnSleep: Bool {
+        didSet {
+            UserDefaults.standard.set(autoMuteOnSleep, forKey: Key.autoMuteOnSleep)
+        }
+    }
+
     private init() {
         let storedTint = UserDefaults.standard.object(forKey: Key.popoverTintLevel) as? Double
         // Default to a strongly transparent Liquid-Glass look — users who want
@@ -131,5 +140,7 @@ final class PreferencesStore: ObservableObject {
         } else {
             self.hudSize = .medium
         }
+
+        self.autoMuteOnSleep = UserDefaults.standard.object(forKey: Key.autoMuteOnSleep) as? Bool ?? true
     }
 }

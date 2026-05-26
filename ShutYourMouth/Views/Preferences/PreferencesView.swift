@@ -11,15 +11,17 @@ import SwiftUI
 
 struct PreferencesView: View {
     @ObservedObject private var preferences = PreferencesStore.shared
+    @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
 
     var body: some View {
         Form {
+            generalSection
             hotkeySection
             hudSection
             popoverSection
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 640)
+        .frame(width: 500, height: 720)
         // Live HUD preview when the user adjusts any HUD-layout option, so
         // they can see the effect without having to toggle mute themselves.
         .onChange(of: preferences.hudHorizontalAlignment) { _, _ in showHUDPreview() }
@@ -87,6 +89,22 @@ struct PreferencesView: View {
             Text("HUD overlay")
         } footer: {
             Text("The floating overlay briefly appears on the main display when the mute state changes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - General
+
+    private var generalSection: some View {
+        Section {
+            Toggle("Launch at login", isOn: $launchAtLogin.isEnabled)
+
+            Toggle("Auto-mute when the Mac sleeps", isOn: $preferences.autoMuteOnSleep)
+        } header: {
+            Text("General")
+        } footer: {
+            Text("On sleep, all controllable mics are muted (only if they were live). On wake, they're unmuted back. Manual mutes you set before sleep are preserved.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
