@@ -21,6 +21,11 @@ final class PreferencesStore: ObservableObject {
         static let popoverTintLevel = "popoverTintLevel"
         static let hotkey = "hotkey"
         static let toggleMode = "toggleMode"
+        static let showHUD = "showHUD"
+        static let hudHoldDuration = "hudHoldDuration"
+        static let hudHorizontalAlignment = "hudHorizontalAlignment"
+        static let hudVerticalAlignment = "hudVerticalAlignment"
+        static let hudSize = "hudSize"
     }
 
     /// Popover background tint level in [0, 1].
@@ -48,6 +53,41 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// Whether the floating HUD overlay is shown on mute state changes.
+    @Published var showHUD: Bool {
+        didSet {
+            UserDefaults.standard.set(showHUD, forKey: Key.showHUD)
+        }
+    }
+
+    /// How long the HUD overlay stays fully visible before fading out, in seconds.
+    @Published var hudHoldDuration: Double {
+        didSet {
+            UserDefaults.standard.set(hudHoldDuration, forKey: Key.hudHoldDuration)
+        }
+    }
+
+    /// Horizontal placement of the HUD overlay on the main display.
+    @Published var hudHorizontalAlignment: HUDHorizontalAlignment {
+        didSet {
+            UserDefaults.standard.set(hudHorizontalAlignment.rawValue, forKey: Key.hudHorizontalAlignment)
+        }
+    }
+
+    /// Vertical placement of the HUD overlay on the main display.
+    @Published var hudVerticalAlignment: HUDVerticalAlignment {
+        didSet {
+            UserDefaults.standard.set(hudVerticalAlignment.rawValue, forKey: Key.hudVerticalAlignment)
+        }
+    }
+
+    /// HUD size variant (small / medium / large).
+    @Published var hudSize: HUDSize {
+        didSet {
+            UserDefaults.standard.set(hudSize.rawValue, forKey: Key.hudSize)
+        }
+    }
+
     private init() {
         let storedTint = UserDefaults.standard.object(forKey: Key.popoverTintLevel) as? Double
         // Default to a strongly transparent Liquid-Glass look — users who want
@@ -66,6 +106,30 @@ final class PreferencesStore: ObservableObject {
             self.toggleMode = mode
         } else {
             self.toggleMode = .toggle
+        }
+
+        self.showHUD = UserDefaults.standard.object(forKey: Key.showHUD) as? Bool ?? true
+        self.hudHoldDuration = UserDefaults.standard.object(forKey: Key.hudHoldDuration) as? Double ?? 1.5
+
+        if let raw = UserDefaults.standard.string(forKey: Key.hudHorizontalAlignment),
+           let value = HUDHorizontalAlignment(rawValue: raw) {
+            self.hudHorizontalAlignment = value
+        } else {
+            self.hudHorizontalAlignment = .center
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: Key.hudVerticalAlignment),
+           let value = HUDVerticalAlignment(rawValue: raw) {
+            self.hudVerticalAlignment = value
+        } else {
+            self.hudVerticalAlignment = .bottom
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: Key.hudSize),
+           let value = HUDSize(rawValue: raw) {
+            self.hudSize = value
+        } else {
+            self.hudSize = .medium
         }
     }
 }

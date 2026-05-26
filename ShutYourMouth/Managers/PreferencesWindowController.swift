@@ -35,7 +35,17 @@ final class PreferencesWindowController: NSObject, NSWindowDelegate {
             let win = NSWindow(contentViewController: hosting)
             win.title = "Shut Your Mouth — Preferences"
             win.styleMask = [.titled, .closable, .miniaturizable]
-            win.center()
+            // Anchor to the top-left of the main display on first creation.
+            // `isReleasedWhenClosed = false` means the user's later manual
+            // positioning is preserved across close/reopen cycles.
+            if let screen = NSScreen.main {
+                let visible = screen.visibleFrame
+                let margin: CGFloat = 40
+                win.setFrameTopLeftPoint(NSPoint(
+                    x: visible.minX + margin,
+                    y: visible.maxY - margin
+                ))
+            }
             // Keep the window instance alive across close/reopen cycles so
             // PreferencesView's @ObservedObject state stays consistent.
             win.isReleasedWhenClosed = false
@@ -49,6 +59,10 @@ final class PreferencesWindowController: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        // Belt-and-suspenders: `orderFrontRegardless` ignores the app's active
+        // state so the window comes to the front even if activation didn't
+        // fully take (a quirk we've seen on LSUIElement-only apps).
+        window?.orderFrontRegardless()
     }
 
     // MARK: - NSWindowDelegate

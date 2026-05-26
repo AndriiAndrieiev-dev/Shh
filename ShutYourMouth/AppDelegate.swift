@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         wireHotkeyCallbacks()
         observePreferencesChanges()
+        observeMuteForHUD()
 
         // Triggers the native Accessibility consent alert on first launch if
         // the permission hasn't been granted yet.
@@ -69,6 +70,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst() // skip initial value emitted on subscribe
             .sink { binding in
                 HotkeyManager.shared.updateBinding(binding)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Show the floating HUD overlay on every mute state change, regardless
+    /// of trigger (hotkey, click-on-icon, popover button). Drops the initial
+    /// emission so we don't pop up at app launch. Respects the
+    /// `PreferencesStore.showHUD` toggle.
+    private func observeMuteForHUD() {
+        AudioDeviceManager.shared.$muteStates
+            .receive(on: DispatchQueue.main)
+            .dropFirst()
+            .sink { _ in
+                guard PreferencesStore.shared.showHUD else { return }
+                let audio = AudioDeviceManager.shared
+                HUDController.shared.show(
+                    isMuted: audio.allInputDevicesMuted,
+                    scopeLabel: "All Devices"
+                )
             }
             .store(in: &cancellables)
     }

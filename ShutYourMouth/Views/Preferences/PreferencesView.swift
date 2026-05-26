@@ -15,10 +15,81 @@ struct PreferencesView: View {
     var body: some View {
         Form {
             hotkeySection
+            hudSection
             popoverSection
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 380)
+        .frame(width: 500, height: 640)
+        // Live HUD preview when the user adjusts any HUD-layout option, so
+        // they can see the effect without having to toggle mute themselves.
+        .onChange(of: preferences.hudHorizontalAlignment) { _, _ in showHUDPreview() }
+        .onChange(of: preferences.hudVerticalAlignment)   { _, _ in showHUDPreview() }
+        .onChange(of: preferences.hudSize)                { _, _ in showHUDPreview() }
+        .onChange(of: preferences.hudHoldDuration)        { _, _ in showHUDPreview() }
+    }
+
+    private func showHUDPreview() {
+        // Reflect current mute state so the preview looks identical to a real
+        // toggle — only the geometry/duration differs.
+        HUDController.shared.show(
+            isMuted: AudioDeviceManager.shared.allInputDevicesMuted,
+            scopeLabel: "All Devices"
+        )
+    }
+
+    // MARK: - HUD overlay
+
+    private var hudSection: some View {
+        Section {
+            Toggle("Show HUD on mute change", isOn: $preferences.showHUD)
+
+            Picker("Horizontal", selection: $preferences.hudHorizontalAlignment) {
+                ForEach(HUDHorizontalAlignment.allCases) { alignment in
+                    Text(alignment.displayName).tag(alignment)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!preferences.showHUD)
+
+            Picker("Vertical", selection: $preferences.hudVerticalAlignment) {
+                ForEach(HUDVerticalAlignment.allCases) { alignment in
+                    Text(alignment.displayName).tag(alignment)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!preferences.showHUD)
+
+            Picker("Size", selection: $preferences.hudSize) {
+                ForEach(HUDSize.allCases) { size in
+                    Text(size.displayName).tag(size)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!preferences.showHUD)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Display duration")
+                    Spacer()
+                    Text(String(format: "%.1f s", preferences.hudHoldDuration))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(
+                    value: $preferences.hudHoldDuration,
+                    in: 0.5...3.0,
+                    step: 0.1
+                )
+                .disabled(!preferences.showHUD)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("HUD overlay")
+        } footer: {
+            Text("The floating overlay briefly appears on the main display when the mute state changes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     // MARK: - Hotkey & mode
