@@ -113,7 +113,7 @@ final class MenuBarController: NSObject {
         // Muted   → red `mic.slash.fill` (palette, isTemplate=false)
         // Unmuted → standard `mic.fill` (template, auto-tinted by menu bar)
         let baseConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        if audio.allInputDevicesMuted {
+        if audio.isActiveSelectionMuted {
             let coloredConfig = baseConfig.applying(
                 NSImage.SymbolConfiguration(paletteColors: [.systemRed])
             )
@@ -139,13 +139,13 @@ final class MenuBarController: NSObject {
             event.type == .rightMouseUp ||
             (event.type == .leftMouseUp && event.modifierFlags.contains(.control))
 
-        log.info("handleClick: type=\(String(describing: event.type)) isRightClick=\(isRightClick) currentMuted=\(self.audio.allInputDevicesMuted)")
+        log.info("handleClick: type=\(String(describing: event.type)) isRightClick=\(isRightClick) currentMuted=\(self.audio.isActiveSelectionMuted)")
 
         if isRightClick {
             togglePanel(sender)
         } else {
-            audio.toggleMuteAll()
-            log.info("  after toggle: allMuted=\(self.audio.allInputDevicesMuted)")
+            audio.toggleMuteActive()
+            log.info("  after toggle: allMuted=\(self.audio.isActiveSelectionMuted)")
         }
     }
 

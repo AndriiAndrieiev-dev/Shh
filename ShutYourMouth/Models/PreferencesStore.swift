@@ -27,6 +27,8 @@ final class PreferencesStore: ObservableObject {
         static let hudVerticalAlignment = "hudVerticalAlignment"
         static let hudSize = "hudSize"
         static let autoMuteOnSleep = "autoMuteOnSleep"
+        static let useAllDevices = "useAllDevices"
+        static let selectedDeviceUIDs = "selectedDeviceUIDs"
     }
 
     /// Popover background tint level in [0, 1].
@@ -97,6 +99,21 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// When true (default), mute actions apply to every controllable input
+    /// device. When false, only devices whose UID is in `selectedDeviceUIDs`.
+    @Published var useAllDevices: Bool {
+        didSet {
+            UserDefaults.standard.set(useAllDevices, forKey: Key.useAllDevices)
+        }
+    }
+
+    /// Per-device selection used only when `useAllDevices == false`.
+    @Published var selectedDeviceUIDs: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(selectedDeviceUIDs), forKey: Key.selectedDeviceUIDs)
+        }
+    }
+
     private init() {
         let storedTint = UserDefaults.standard.object(forKey: Key.popoverTintLevel) as? Double
         // Default to a strongly transparent Liquid-Glass look — users who want
@@ -142,5 +159,11 @@ final class PreferencesStore: ObservableObject {
         }
 
         self.autoMuteOnSleep = UserDefaults.standard.object(forKey: Key.autoMuteOnSleep) as? Bool ?? true
+        self.useAllDevices = UserDefaults.standard.object(forKey: Key.useAllDevices) as? Bool ?? true
+        if let stored = UserDefaults.standard.array(forKey: Key.selectedDeviceUIDs) as? [String] {
+            self.selectedDeviceUIDs = Set(stored)
+        } else {
+            self.selectedDeviceUIDs = []
+        }
     }
 }

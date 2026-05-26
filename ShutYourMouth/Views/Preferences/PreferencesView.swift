@@ -36,8 +36,8 @@ struct PreferencesView: View {
         // Reflect current mute state so the preview looks identical to a real
         // toggle — only the geometry/duration differs.
         HUDController.shared.show(
-            isMuted: AudioDeviceManager.shared.allInputDevicesMuted,
-            scopeLabel: "All Devices"
+            isMuted: AudioDeviceManager.shared.isActiveSelectionMuted,
+            scopeLabel: "Preview"
         )
     }
 

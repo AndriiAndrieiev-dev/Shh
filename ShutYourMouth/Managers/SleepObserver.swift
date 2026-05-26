@@ -75,13 +75,13 @@ final class SleepObserver {
         // Only auto-mute if the mic is currently live — otherwise we'd have
         // nothing to "roll back" on wake, and we don't want to overwrite a
         // user's explicit manual mute.
-        guard !audio.allInputDevicesMuted else {
+        guard !audio.isActiveSelectionMuted else {
             log.debug("Sleep observed — already muted, no auto action")
             return
         }
-        log.info("Sleep observed — auto-muting all controllable input devices")
+        log.info("Sleep observed — auto-muting active selection")
         pendingAutoUnmuteOnWake = true
-        audio.setMutedAll(true)
+        audio.setMutedActive(true)
     }
 
     private func handleWake() {
@@ -98,6 +98,6 @@ final class SleepObserver {
             return
         }
         log.info("Wake observed — restoring mic to pre-sleep state (unmuted)")
-        AudioDeviceManager.shared.setMutedAll(false)
+        AudioDeviceManager.shared.setMutedActive(false)
     }
 }

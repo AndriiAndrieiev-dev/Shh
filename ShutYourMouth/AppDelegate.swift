@@ -53,13 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let audio = AudioDeviceManager.shared
             switch PreferencesStore.shared.toggleMode {
             case .toggle:
-                audio.toggleMuteAll()
+                audio.toggleMuteActive()
             case .pushToTalkHoldToMute:
                 // Default state is unmuted; while held → muted
-                audio.setMutedAll(true)
+                audio.setMutedActive(true)
             case .pushToTalkHoldToTalk:
                 // Default state is muted; while held → unmuted
-                audio.setMutedAll(false)
+                audio.setMutedActive(false)
             }
         }
         HotkeyManager.shared.onKeyUp = {
@@ -68,9 +68,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .toggle:
                 break
             case .pushToTalkHoldToMute:
-                audio.setMutedAll(false)
+                audio.setMutedActive(false)
             case .pushToTalkHoldToTalk:
-                audio.setMutedAll(true)
+                audio.setMutedActive(true)
             }
         }
     }
@@ -98,10 +98,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard PreferencesStore.shared.showHUD else { return }
                 let audio = AudioDeviceManager.shared
                 HUDController.shared.show(
-                    isMuted: audio.allInputDevicesMuted,
-                    scopeLabel: "All Devices"
+                    isMuted: audio.isActiveSelectionMuted,
+                    scopeLabel: Self.makeScopeLabel(audio: audio)
                 )
             }
             .store(in: &cancellables)
+    }
+
+    /// Human-readable label describing what the current mute action applies
+    /// to: "All Devices", a single device's name, or "N Devices".
+    private static func makeScopeLabel(audio: AudioDeviceManager) -> String {
+        if PreferencesStore.shared.useAllDevices {
+            return "All Devices"
+        }
+        let active = audio.activeDevices
+        switch active.count {
+        case 0:  return "No Selection"
+        case 1:  return active[0].name
+        default: return "\(active.count) Devices"
+        }
     }
 }

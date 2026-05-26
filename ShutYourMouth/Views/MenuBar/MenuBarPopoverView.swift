@@ -16,20 +16,20 @@ struct MenuBarPopoverView: View {
         VStack(spacing: 16) {
             stateCircle
 
-            Text(audio.allInputDevicesMuted ? "Microphone OFF" : "Microphone ON")
+            Text(audio.isActiveSelectionMuted ? "Microphone OFF" : "Microphone ON")
                 .font(.headline)
                 .foregroundStyle(.primary)
 
             Button {
-                audio.toggleMuteAll()
+                audio.toggleMuteActive()
             } label: {
-                Text(audio.allInputDevicesMuted ? "Unmute All" : "Mute All")
+                Text(toggleButtonLabel)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut(.return)
-            .disabled(audio.inputDevices.isEmpty)
+            .disabled(audio.activeDevices.isEmpty)
 
             if !audio.inputDevices.isEmpty {
                 Divider()
@@ -92,7 +92,7 @@ struct MenuBarPopoverView: View {
 
     private var stateCircle: some View {
         Button {
-            audio.toggleMuteAll()
+            audio.toggleMuteActive()
         } label: {
             ZStack {
                 Circle()
@@ -100,15 +100,23 @@ struct MenuBarPopoverView: View {
                     .frame(width: 120, height: 120)
                     .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
 
-                Image(systemName: audio.allInputDevicesMuted ? "mic.slash.fill" : "mic.fill")
+                Image(systemName: audio.isActiveSelectionMuted ? "mic.slash.fill" : "mic.fill")
                     .font(.system(size: 56, weight: .regular))
-                    .foregroundStyle(audio.allInputDevicesMuted ? AnyShapeStyle(.red.opacity(0.85)) : AnyShapeStyle(.primary))
+                    .foregroundStyle(audio.isActiveSelectionMuted ? AnyShapeStyle(.red.opacity(0.85)) : AnyShapeStyle(.primary))
                     .symbolRenderingMode(.hierarchical)
                     .contentTransition(.symbolEffect(.replace))
             }
         }
         .buttonStyle(.plain)
-        .help(audio.allInputDevicesMuted ? "Unmute all (or click the icon in menu bar)" : "Mute all (or click the icon in menu bar)")
+        .help(audio.isActiveSelectionMuted ? "Unmute (or click the icon in menu bar)" : "Mute (or click the icon in menu bar)")
+    }
+
+    /// "Mute All" / "Unmute All" when all devices are in scope,
+    /// "Mute Selected" / "Unmute Selected" when a subset is selected.
+    private var toggleButtonLabel: String {
+        let isMuted = audio.isActiveSelectionMuted
+        let scope = preferences.useAllDevices ? "All" : "Selected"
+        return isMuted ? "Unmute \(scope)" : "Mute \(scope)"
     }
 
     /// Open the Preferences window. Goes through `PreferencesWindowController`
@@ -133,45 +141,91 @@ struct MenuBarPopoverView: View {
 
     private var deviceList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Input Devices")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
+            HStack {
+                Text("Input Devices")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Toggle("All", isOn: $preferences.useAllDevices)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
 
             ForEach(audio.inputDevices) { device in
-                HStack(spacing: 8) {
-                    Image(systemName: deviceIconName(for: device))
-                        .foregroundStyle(deviceIconColor(for: device))
-                        .font(.system(size: 13))
-                        .frame(width: 16)
-
-                    Text(device.name)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(device.isControllable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-
-                    if device.isDefaultInput {
-                        Text("default")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary, in: Capsule())
-                    }
-
-                    if !device.isControllable {
-                        Text("no control")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary.opacity(0.5), in: Capsule())
-                    }
-
-                    Spacer()
-                }
+                deviceRow(device)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func deviceRow(_ device: AudioDevice) -> some View {
+        HStack(spacing: 8) {
+            if device.isControllable {
+                Button {
+                    toggleSelection(device)
+                } label: {
+                    Image(systemName: isSelected(device) ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(isSelected(device) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+                .disabled(preferences.useAllDevices)
+                .help(preferences.useAllDevices ? "Turn off 'All' to pick specific devices" : (isSelected(device) ? "Remove from selection" : "Add to selection"))
+            } else {
+                Image(systemName: "square.slash")
+                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 13))
+            }
+
+            Image(systemName: deviceIconName(for: device))
+                .foregroundStyle(deviceIconColor(for: device))
+                .font(.system(size: 13))
+                .frame(width: 16)
+
+            Text(device.name)
+                .font(.subheadline)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .foregroundStyle(device.isControllable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+
+            if device.isDefaultInput {
+                Text("default")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.quaternary, in: Capsule())
+            }
+
+            if !device.isControllable {
+                Text("no control")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.quaternary.opacity(0.5), in: Capsule())
+            }
+
+            Spacer()
+        }
+    }
+
+    /// True if the device is currently subject to mute actions —
+    /// either we're in "All" mode (everything controllable is in scope),
+    /// or it's been picked individually.
+    private func isSelected(_ device: AudioDevice) -> Bool {
+        guard device.isControllable else { return false }
+        if preferences.useAllDevices { return true }
+        return preferences.selectedDeviceUIDs.contains(device.uid)
+    }
+
+    private func toggleSelection(_ device: AudioDevice) {
+        guard device.isControllable, !preferences.useAllDevices else { return }
+        if preferences.selectedDeviceUIDs.contains(device.uid) {
+            preferences.selectedDeviceUIDs.remove(device.uid)
+        } else {
+            preferences.selectedDeviceUIDs.insert(device.uid)
         }
     }
 }

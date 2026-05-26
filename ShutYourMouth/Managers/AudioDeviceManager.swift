@@ -44,14 +44,27 @@ final class AudioDeviceManager: ObservableObject {
 
     // MARK: - Public API
 
-    /// True iff every *controllable* input device is currently muted.
+    /// Devices currently subject to mute actions after applying the user
+    /// selection from PreferencesStore (useAllDevices vs selectedDeviceUIDs).
     /// Non-controllable devices (Continuity mics, virtual routing devices)
-    /// are excluded from this check — otherwise they would permanently keep
-    /// it at `false` and break the toggle logic.
-    var allInputDevicesMuted: Bool {
+    /// are filtered out — they can be shown in the UI for transparency but
+    /// can't actually be muted.
+    var activeDevices: [AudioDevice] {
+        let prefs = PreferencesStore.shared
         let controllable = inputDevices.filter(\.isControllable)
-        guard !controllable.isEmpty else { return false }
-        return controllable.allSatisfy { muteStates[$0.uid] == true }
+        if prefs.useAllDevices {
+            return controllable
+        }
+        return controllable.filter { prefs.selectedDeviceUIDs.contains($0.uid) }
+    }
+
+    /// True iff every active-selection device is currently muted. Returns
+    /// `false` when the selection is empty so the icon falls back to the
+    /// "on" state (visually that's an empty/disabled selection).
+    var isActiveSelectionMuted: Bool {
+        let active = activeDevices
+        guard !active.isEmpty else { return false }
+        return active.allSatisfy { muteStates[$0.uid] == true }
     }
 
     /// Re-enumerate input devices (hot-plug). Preserves intent-based mute state
@@ -78,28 +91,27 @@ final class AudioDeviceManager: ObservableObject {
     }
 
 
-    /// Mute or unmute every controllable input device.
+    /// Mute or unmute every device in the active selection.
     ///
     /// State is updated based on *intent* rather than a CoreAudio read-back.
     /// Some virtual devices (notably Microsoft Teams Audio) acknowledge the
     /// mute write via `AudioObjectSetPropertyData` but immediately reset the
     /// underlying state via their driver, so a subsequent read would falsely
-    /// say the device isn't muted — breaking `allInputDevicesMuted` and the
-    /// toggle. Trusting our own write keeps the UI consistent with the user's
-    /// last action; an explicit `refresh()` re-syncs from CoreAudio when the
-    /// user wants ground truth.
-    func setMutedAll(_ muted: Bool) {
+    /// say the device isn't muted — breaking the toggle. Trusting our own
+    /// write keeps the UI consistent with the user's last action; an explicit
+    /// `refresh()` re-syncs from CoreAudio when the user wants ground truth.
+    func setMutedActive(_ muted: Bool) {
         var states = muteStates
-        for device in inputDevices where device.isControllable {
+        for device in activeDevices {
             applyMute(muted, to: device)
             states[device.uid] = muted
         }
         muteStates = states
     }
 
-    /// Toggle mute on every controllable input device based on aggregate state.
-    func toggleMuteAll() {
-        setMutedAll(!allInputDevicesMuted)
+    /// Toggle mute on the active-selection devices based on aggregate state.
+    func toggleMuteActive() {
+        setMutedActive(!isActiveSelectionMuted)
     }
 
     // MARK: - Hot-plug listener
