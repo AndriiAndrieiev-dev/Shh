@@ -12,6 +12,7 @@ import SwiftUI
 struct PreferencesView: View {
     @ObservedObject private var preferences = PreferencesStore.shared
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
+    @ObservedObject private var permissions = PermissionsManager.shared
 
     var body: some View {
         Form {
@@ -19,9 +20,10 @@ struct PreferencesView: View {
             hotkeySection
             hudSection
             popoverSection
+            permissionsSection
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 720)
+        .frame(width: 540, height: 820)
         // Live HUD preview when the user adjusts any HUD-layout option, so
         // they can see the effect without having to toggle mute themselves.
         .onChange(of: preferences.hudHorizontalAlignment) { _, _ in showHUDPreview() }
@@ -192,6 +194,26 @@ struct PreferencesView: View {
         case ..<0.6: return "Regular"
         case ..<0.8: return "Thick"
         default:     return "Ultra thick"
+        }
+    }
+
+    // MARK: - Permissions
+
+    private var permissionsSection: some View {
+        Section {
+            ForEach(PermissionKind.allCases) { kind in
+                PermissionStatusRow(
+                    kind: kind,
+                    status: permissions.status(for: kind),
+                    onOpenSettings: { permissions.openSystemSettings(for: kind) }
+                )
+            }
+        } header: {
+            Text("Permissions")
+        } footer: {
+            Text("Statuses refresh automatically each time you return to the app from System Settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

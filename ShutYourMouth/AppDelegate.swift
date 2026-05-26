@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the user might have toggled it in System Settings while we were
         // not running).
         LaunchAtLoginManager.shared.refresh()
+
+        // Permission statuses re-read on every app-became-active.
+        PermissionsManager.shared.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

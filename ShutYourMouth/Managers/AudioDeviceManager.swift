@@ -32,8 +32,14 @@ final class AudioDeviceManager: ObservableObject {
     /// Saved per-device pre-mute volumes (for devices that need the volume=0 fallback).
     private var savedVolumes: [String: Float32] = [:]
 
+    /// Retained CoreAudio listener block for hot-plug detection. Stored so it
+    /// can be removed cleanly (and so ARC doesn't drop it while the system
+    /// holds a weak reference).
+    private var deviceListListener: AudioObjectPropertyListenerBlock?
+
     private init() {
         refresh()
+        installDeviceListChangeListener()
     }
 
     // MARK: - Public API
@@ -94,6 +100,43 @@ final class AudioDeviceManager: ObservableObject {
     /// Toggle mute on every controllable input device based on aggregate state.
     func toggleMuteAll() {
         setMutedAll(!allInputDevicesMuted)
+    }
+
+    // MARK: - Hot-plug listener
+
+    /// Subscribe to changes in the system-wide audio device list. Fires when
+    /// any device (USB mic, AirPods, Continuity mic, virtual loopback) is
+    /// plugged in or out. We just re-`refresh()` — the refresh method already
+    /// preserves intent-based mute state for existing devices and reads
+    /// initial state for any newly-seen ones.
+    private func installDeviceListChangeListener() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let listener: AudioObjectPropertyListenerBlock = { _, _ in
+            // Listener fires on the dispatch queue we pass below; hop to
+            // MainActor explicitly to satisfy strict concurrency.
+            Task { @MainActor in
+                AudioDeviceManager.shared.refresh()
+            }
+        }
+        deviceListListener = listener
+
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main,
+            listener
+        )
+        if status != noErr {
+            log.error("Failed to install device-list change listener: status=\(status)")
+            deviceListListener = nil
+        } else {
+            log.info("Device-list hot-plug listener installed")
+        }
     }
 
     // MARK: - CoreAudio: enumerate input devices
