@@ -1,4 +1,4 @@
-name: ShutYourMouth
+name: Shh
 
 options:
   bundleIdPrefix: com.andrieiev
@@ -19,30 +19,30 @@ settings:
     DEVELOPMENT_TEAM: ""
 
 targets:
-  ShutYourMouth:
+  Shh:
     type: application
     platform: macOS
     sources:
-      - path: ShutYourMouth
+      - path: Shh
         excludes:
           - "**/*.md"
     info:
-      path: ShutYourMouth/Info.plist
+      path: Shh/Info.plist
       properties:
-        CFBundleDisplayName: "Shut Your Mouth"
+        CFBundleDisplayName: "Shh…"
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         LSUIElement: true
         LSMinimumSystemVersion: "26.0"
-        NSMicrophoneUsageDescription: "Shut Your Mouth optionally displays which app is currently using your microphone. Microphone access is not required for the core mute/unmute functionality."
+        NSMicrophoneUsageDescription: "Shh… optionally displays which app is currently using your microphone. Microphone access is not required for the core mute/unmute functionality."
         NSHumanReadableCopyright: "© 2026 Andrii Andrieiev"
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.andrieiev.shutyourmouth
-        PRODUCT_NAME: ShutYourMouth
-        PRODUCT_MODULE_NAME: ShutYourMouth
+        PRODUCT_BUNDLE_IDENTIFIER: com.andrieiev.shh
+        PRODUCT_NAME: Shh
+        PRODUCT_MODULE_NAME: Shh
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
