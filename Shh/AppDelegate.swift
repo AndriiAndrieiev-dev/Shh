@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wireHotkeyCallbacks()
         observePreferencesChanges()
         observeMuteForHUD()
+        observeAccessibilityGrant()
 
         // Triggers the native Accessibility consent alert on first launch if
         // the permission hasn't been granted yet.
@@ -85,6 +86,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .dropFirst() // skip initial value emitted on subscribe
             .sink { binding in
                 HotkeyManager.shared.updateBinding(binding)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// When Accessibility flips to granted (e.g. the user just enabled it in
+    /// the onboarding flow or System Settings), (re)install the event tap.
+    /// `HotkeyManager.start(binding:)` is idempotent — it no-ops if the tap is
+    /// already installed — so this safely covers the "granted after launch"
+    /// case without requiring an app restart.
+    private func observeAccessibilityGrant() {
+        PermissionsManager.shared.$accessibility
+            .receive(on: DispatchQueue.main)
+            .sink { status in
+                if status == .granted {
+                    HotkeyManager.shared.start(binding: PreferencesStore.shared.hotkey)
+                }
             }
             .store(in: &cancellables)
     }
