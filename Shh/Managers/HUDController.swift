@@ -30,6 +30,11 @@ final class HUDController {
     private let host: NSHostingController<HUDView>
     private var hideTask: Task<Void, Never>?
 
+    /// When true, the HUD is held open indefinitely (push-to-talk "keep HUD
+    /// while live" mode) and timed `show(...)` calls are ignored so they don't
+    /// fade it out.
+    private var isSticky = false
+
     private static let fadeInDuration: TimeInterval = 0.2
     private static let fadeOutDuration: TimeInterval = 0.4
 
@@ -60,6 +65,9 @@ final class HUDController {
     /// rapid sequence of toggles collapses into a single dismissal at the
     /// end of the last one.
     func show(isMuted: Bool, scopeLabel: String) {
+        // A sticky HUD owns the panel; don't let a timed flash fade it away.
+        guard !isSticky else { return }
+
         let prefs = PreferencesStore.shared
         let sizeVariant = prefs.hudSize
         let dim = sizeVariant.dimension
@@ -88,6 +96,39 @@ final class HUDController {
             guard let self, !Task.isCancelled else { return }
             self.fadeOut()
         }
+    }
+
+    /// Show the HUD and keep it visible indefinitely (no auto fade-out).
+    /// Used for the push-to-talk "keep HUD while live" mode.
+    func showSticky(isMuted: Bool, scopeLabel: String) {
+        isSticky = true
+        hideTask?.cancel()
+        hideTask = nil
+
+        let prefs = PreferencesStore.shared
+        let sizeVariant = prefs.hudSize
+        let dim = sizeVariant.dimension
+        let panelSize = NSSize(width: dim, height: dim)
+
+        host.rootView = HUDView(isMuted: isMuted, scopeLabel: scopeLabel, sizeVariant: sizeVariant)
+        panel.setContentSize(panelSize)
+        positionPanel(size: panelSize)
+
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.fadeInDuration
+            panel.animator().alphaValue = 1.0
+        }
+    }
+
+    /// Release a sticky HUD and fade it out.
+    func hideSticky() {
+        guard isSticky else { return }
+        isSticky = false
+        fadeOut()
     }
 
     private func fadeOut() {

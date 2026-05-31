@@ -192,10 +192,18 @@ final class AudioDeviceManager: ObservableObject {
                 scope: kAudioObjectPropertyScopeGlobal
             ) ?? "(unnamed device)"
 
-            // Include all input devices; flag non-controllable ones so the
-            // UI can show them while the toggle logic excludes them. Skipping
-            // them entirely (the previous behavior) hid Continuity mics that
-            // users still expect to see in the device list.
+            // Skip virtual / loopback / aggregate devices (e.g. "Microsoft
+            // Teams Audio", BlackHole). They may accept a CoreAudio mute write,
+            // but it has no effect on real calls — apps capture from the
+            // physical mic, not their own loopback. Showing them only misleads
+            // the user, so they're filtered out of the entire UI.
+            if isVirtualTransport(deviceID: id) {
+                log.info("Skipping virtual/loopback device '\(name, privacy: .public)' id=\(id) uid=\(uid, privacy: .public)")
+                continue
+            }
+
+            // Flag non-controllable devices (e.g. some Continuity mics) so the
+            // UI can show them while the toggle logic excludes them.
             let isControllable = canControlMute(deviceID: id) || canControlVolume(deviceID: id)
             if !isControllable {
                 log.info("Non-controllable input device '\(name, privacy: .public)' id=\(id) uid=\(uid, privacy: .public) — will display but skip in toggle")
@@ -213,6 +221,24 @@ final class AudioDeviceManager: ObservableObject {
             if lhs.isDefaultInput != rhs.isDefaultInput { return lhs.isDefaultInput }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
+    }
+
+    /// True for virtual / loopback / aggregate transport types. These show up
+    /// as input devices and may accept a mute write, but muting them does
+    /// nothing useful (apps read from the physical mic), so we hide them.
+    private func isVirtualTransport(deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(deviceID, &address) else { return false }
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transport)
+        guard status == noErr else { return false }
+        return transport == kAudioDeviceTransportTypeVirtual
+            || transport == kAudioDeviceTransportTypeAggregate
     }
 
     private func canControlMute(deviceID: AudioDeviceID) -> Bool {

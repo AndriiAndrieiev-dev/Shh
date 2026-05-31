@@ -106,47 +106,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
     }
 
-    /// Show the floating HUD overlay AND/or play a short system sound on
-    /// every mute state change, regardless of trigger (hotkey, click-on-icon,
-    /// popover button). Both are gated by individual prefs and drop the
-    /// initial emission so we don't fire at app launch.
+    /// React to every mute state change: HUD (timed or sticky), plus the
+    /// optional sound feedback. Drops the initial emission so nothing fires
+    /// at launch.
     private func observeMuteForHUD() {
         AudioDeviceManager.shared.$muteStates
             .receive(on: DispatchQueue.main)
             .dropFirst()
             .sink { _ in
-                let audio = AudioDeviceManager.shared
-                let prefs = PreferencesStore.shared
+                Self.refreshHUD(timedOnMuteChange: true)
 
-                if prefs.showHUD {
-                    HUDController.shared.show(
-                        isMuted: audio.isActiveSelectionMuted,
-                        scopeLabel: Self.makeScopeLabel(audio: audio)
-                    )
-                }
-
-                if prefs.playSoundFeedback {
+                if PreferencesStore.shared.playSoundFeedback {
                     // Two different sounds so the user can tell mute vs unmute
                     // by ear alone — useful when the HUD is hidden or behind a
                     // fullscreen app.
-                    let soundName: NSSound.Name = audio.isActiveSelectionMuted ? "Pop" : "Tink"
+                    let muted = AudioDeviceManager.shared.isActiveSelectionMuted
+                    let soundName: NSSound.Name = muted ? "Pop" : "Tink"
                     NSSound(named: soundName)?.play()
                 }
             }
             .store(in: &cancellables)
+
+        // When the user picks a new mode, snap the mic to that mode's resting
+        // state (Hold to talk → muted, Hold to mute → live) so push-to-talk
+        // starts correctly, then reconcile the sticky HUD.
+        PreferencesStore.shared.$toggleMode
+            .receive(on: DispatchQueue.main)
+            .dropFirst()
+            .sink { mode in
+                if let restingMuted = mode.defaultMutedState {
+                    AudioDeviceManager.shared.setMutedActive(restingMuted)
+                }
+                Self.refreshHUD(timedOnMuteChange: false)
+            }
+            .store(in: &cancellables)
+
+        PreferencesStore.shared.$keepHUDWhileLiveInPTT
+            .receive(on: DispatchQueue.main)
+            .dropFirst()
+            .sink { _ in Self.refreshHUD(timedOnMuteChange: false) }
+            .store(in: &cancellables)
+    }
+
+    /// Central HUD decision. In a push-to-talk mode with "keep HUD while live"
+    /// on, a sticky "Mic ON" HUD is shown the whole time the mic is live and
+    /// hidden while muted. Otherwise the regular timed HUD flashes on each
+    /// mute change (when enabled).
+    ///
+    /// - Parameter timedOnMuteChange: true when called from an actual mute
+    ///   change (allows the timed flash); false when called from a settings
+    ///   change (sticky reconcile only, no flash).
+    private static func refreshHUD(timedOnMuteChange: Bool) {
+        let audio = AudioDeviceManager.shared
+        let prefs = PreferencesStore.shared
+        let muted = audio.isActiveSelectionMuted
+        let scope = makeScopeLabel(audio: audio)
+
+        let stickyMode = prefs.keepHUDWhileLiveInPTT && prefs.toggleMode.isPushToTalk
+
+        if stickyMode {
+            if muted {
+                // Mic is silent — release the sticky HUD.
+                HUDController.shared.hideSticky()
+            } else {
+                // Mic is live — keep the HUD pinned open.
+                HUDController.shared.showSticky(isMuted: false, scopeLabel: scope)
+            }
+            return
+        }
+
+        // Not in sticky mode: make sure any leftover sticky HUD is released,
+        // then do the normal timed flash on real mute changes.
+        HUDController.shared.hideSticky()
+        if timedOnMuteChange && prefs.showHUD {
+            HUDController.shared.show(isMuted: muted, scopeLabel: scope)
+        }
     }
 
     /// Human-readable label describing what the current mute action applies
     /// to: "All Devices", a single device's name, or "N Devices".
     private static func makeScopeLabel(audio: AudioDeviceManager) -> String {
+        let loc = LocalizationManager.shared
         if PreferencesStore.shared.useAllDevices {
-            return "All Devices"
+            return loc.t(.scopeAllDevices)
         }
         let active = audio.activeDevices
         switch active.count {
-        case 0:  return "No Selection"
+        case 0:  return loc.t(.scopeNoSelection)
         case 1:  return active[0].name
-        default: return "\(active.count) Devices"
+        default: return "\(active.count) \(loc.t(.scopeDevicesSuffix))"
         }
     }
 }

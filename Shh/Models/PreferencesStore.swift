@@ -32,6 +32,7 @@ final class PreferencesStore: ObservableObject {
         static let firstLaunchCompleted = "firstLaunchCompleted"
         static let showPersistentIndicator = "showPersistentIndicator"
         static let persistentIndicatorCorner = "persistentIndicatorCorner"
+        static let keepHUDWhileLiveInPTT = "keepHUDWhileLiveInPTT"
     }
 
     /// Popover background tint level in [0, 1].
@@ -140,6 +141,16 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    /// In a push-to-talk mode, keep a sticky "Mic ON" HUD on screen the whole
+    /// time the mic is live (instead of only flashing briefly on change), so
+    /// you always know whether you're currently being heard. Only meaningful
+    /// when `toggleMode.isPushToTalk`.
+    @Published var keepHUDWhileLiveInPTT: Bool {
+        didSet {
+            UserDefaults.standard.set(keepHUDWhileLiveInPTT, forKey: Key.keepHUDWhileLiveInPTT)
+        }
+    }
+
     private init() {
         let storedTint = UserDefaults.standard.object(forKey: Key.popoverTintLevel) as? Double
         // Default to a strongly transparent Liquid-Glass look — users who want
@@ -199,5 +210,6 @@ final class PreferencesStore: ObservableObject {
         } else {
             self.persistentIndicatorCorner = .topRight
         }
+        self.keepHUDWhileLiveInPTT = UserDefaults.standard.object(forKey: Key.keepHUDWhileLiveInPTT) as? Bool ?? false
     }
 }

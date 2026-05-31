@@ -16,6 +16,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @ObservedObject private var permissions = PermissionsManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     let onComplete: () -> Void
 
     var body: some View {
@@ -36,19 +37,19 @@ struct OnboardingView: View {
                     .font(.system(size: 36, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.accentColor)
-                Text("Welcome to Shh…")
+                Text(loc.t(.welcomeTitle))
                     .font(.largeTitle.bold())
             }
-            Text("Mute or push-to-talk your microphone with a single keypress, system-wide.")
+            Text(loc.t(.welcomeBody))
                 .foregroundStyle(.secondary)
         }
     }
 
     private var permissionsBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Permissions")
+            Text(loc.t(.secPermissions))
                 .font(.headline)
-            Text("Shh… needs the two required permissions below to capture the global hotkey. Microphone access is optional and unrelated to mute itself.")
+            Text(loc.t(.onbPermBlurb))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -72,11 +73,11 @@ struct OnboardingView: View {
 
     private var footer: some View {
         HStack {
-            Text(requiredGranted ? "All required permissions are granted." : "Grant the required permissions to continue.")
+            Text(requiredGranted ? loc.t(.onbAllGranted) : loc.t(.onbGrantToContinue))
                 .font(.caption)
                 .foregroundStyle(requiredGranted ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
             Spacer()
-            Button("Get started") {
+            Button(loc.t(.getStarted)) {
                 onComplete()
             }
             .buttonStyle(.borderedProminent)

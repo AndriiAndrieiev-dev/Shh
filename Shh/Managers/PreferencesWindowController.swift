@@ -34,13 +34,20 @@ final class PreferencesWindowController: NSObject, NSWindowDelegate {
             let hosting = NSHostingController(rootView: PreferencesView())
             let win = NSWindow(contentViewController: hosting)
             win.title = "Shh… — Preferences"
-            win.styleMask = [.titled, .closable, .miniaturizable]
-            // Anchor to the top-left of the main display on first creation.
-            // `isReleasedWhenClosed = false` means the user's later manual
-            // positioning is preserved across close/reopen cycles.
+            // `.resizable` lets the user drag the window taller/shorter — the
+            // content Form scrolls, so on short displays it no longer gets
+            // stuck under the Dock with no way to reach the bottom rows.
+            win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+
+            // Pick an initial height that fits the screen (capped so it never
+            // spawns underneath the Dock), then anchor to the top-left.
             if let screen = NSScreen.main {
                 let visible = screen.visibleFrame
                 let margin: CGFloat = 40
+                let width: CGFloat = 540
+                let desiredHeight: CGFloat = 900
+                let height = min(desiredHeight, visible.height - margin * 2)
+                win.setContentSize(NSSize(width: width, height: height))
                 win.setFrameTopLeftPoint(NSPoint(
                     x: visible.minX + margin,
                     y: visible.maxY - margin

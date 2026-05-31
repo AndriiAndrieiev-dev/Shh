@@ -30,7 +30,7 @@ struct HUDView: View {
             }
 
             VStack(spacing: 2) {
-                Text(isMuted ? "Mic OFF" : "Mic ON")
+                Text(isMuted ? LocalizationManager.shared.t(.hudMicOff) : LocalizationManager.shared.t(.hudMicOn))
                     .font(titleFont)
                     .foregroundStyle(.primary)
                 Text(scopeLabel)

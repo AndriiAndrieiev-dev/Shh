@@ -30,4 +30,21 @@ enum ToggleMode: String, Codable, CaseIterable, Sendable, Identifiable {
         case .pushToTalkHoldToTalk:   return "Hold to talk (default muted)"
         }
     }
+
+    /// True for the two push-to-talk variants, false for plain toggle.
+    var isPushToTalk: Bool {
+        self != .toggle
+    }
+
+    /// The mute state the mic should rest in when this mode is selected and
+    /// the hotkey isn't being held. `nil` for `.toggle` (no inherent resting
+    /// state — leave the mic as-is). Applied immediately when the user picks
+    /// the mode so push-to-talk starts in the right state.
+    var defaultMutedState: Bool? {
+        switch self {
+        case .toggle:                 return nil
+        case .pushToTalkHoldToMute:   return false   // default ON / live
+        case .pushToTalkHoldToTalk:   return true    // default muted
+        }
+    }
 }

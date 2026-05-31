@@ -13,6 +13,8 @@ struct PermissionStatusRow: View {
     let status: PermissionStatus
     let onOpenSettings: () -> Void
 
+    @ObservedObject private var loc = LocalizationManager.shared
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: statusIconName)
@@ -22,10 +24,10 @@ struct PermissionStatusRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(kind.displayName)
+                    Text(localizedName)
                         .font(.body)
                     if !kind.isRequired {
-                        Text("optional")
+                        Text(loc.t(.optional))
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
@@ -33,7 +35,7 @@ struct PermissionStatusRow: View {
                             .background(.quaternary.opacity(0.6), in: Capsule())
                     }
                 }
-                Text(kind.explanation)
+                Text(localizedExplanation)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -42,12 +44,28 @@ struct PermissionStatusRow: View {
             Spacer(minLength: 8)
 
             Button(action: onOpenSettings) {
-                Text("Open Settings")
+                Text(loc.t(.openSettings))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
         .padding(.vertical, 2)
+    }
+
+    private var localizedName: String {
+        switch kind {
+        case .accessibility:   return loc.t(.permAccessibility)
+        case .inputMonitoring: return loc.t(.permInputMonitoring)
+        case .microphone:      return loc.t(.permMicrophone)
+        }
+    }
+
+    private var localizedExplanation: String {
+        switch kind {
+        case .accessibility:   return loc.t(.permAccessibilityWhy)
+        case .inputMonitoring: return loc.t(.permInputMonitoringWhy)
+        case .microphone:      return loc.t(.permMicrophoneWhy)
+        }
     }
 
     private var statusIconName: String {

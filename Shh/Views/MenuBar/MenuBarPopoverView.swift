@@ -11,12 +11,13 @@ import SwiftUI
 struct MenuBarPopoverView: View {
     @ObservedObject var audio: AudioDeviceManager
     @ObservedObject private var preferences = PreferencesStore.shared
+    @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
         VStack(spacing: 16) {
             stateCircle
 
-            Text(audio.isActiveSelectionMuted ? "Microphone OFF" : "Microphone ON")
+            Text(audio.isActiveSelectionMuted ? loc.t(.micOff) : loc.t(.micOn))
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -50,11 +51,11 @@ struct MenuBarPopoverView: View {
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(",", modifiers: .command)
-                .help("Preferences")
+                .help(loc.t(.preferencesTooltip))
 
                 Spacer()
 
-                Button("Quit") {
+                Button(loc.t(.quit)) {
                     NSApplication.shared.terminate(nil)
                 }
                 .buttonStyle(.plain)
@@ -108,15 +109,19 @@ struct MenuBarPopoverView: View {
             }
         }
         .buttonStyle(.plain)
-        .help(audio.isActiveSelectionMuted ? "Unmute (or click the icon in menu bar)" : "Mute (or click the icon in menu bar)")
+        .help(audio.isActiveSelectionMuted ? loc.t(.toggleCircleHelpUnmute) : loc.t(.toggleCircleHelpMute))
     }
 
     /// "Mute All" / "Unmute All" when all devices are in scope,
     /// "Mute Selected" / "Unmute Selected" when a subset is selected.
     private var toggleButtonLabel: String {
         let isMuted = audio.isActiveSelectionMuted
-        let scope = preferences.useAllDevices ? "All" : "Selected"
-        return isMuted ? "Unmute \(scope)" : "Mute \(scope)"
+        switch (preferences.useAllDevices, isMuted) {
+        case (true, true):   return loc.t(.unmuteAll)
+        case (true, false):  return loc.t(.muteAll)
+        case (false, true):  return loc.t(.unmuteSelected)
+        case (false, false): return loc.t(.muteSelected)
+        }
     }
 
     /// Open the Preferences window. Goes through `PreferencesWindowController`
@@ -160,18 +165,18 @@ struct MenuBarPopoverView: View {
             .animation(.easeInOut(duration: 0.15), value: preferences.useAllDevices)
         }
         .buttonStyle(.plain)
-        .help(preferences.useAllDevices ? "Switch to per-device selection" : "Apply to all controllable devices")
+        .help(preferences.useAllDevices ? loc.t(.allToggleHelpOn) : loc.t(.allToggleHelpOff))
     }
 
     private var deviceList: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Input Devices")
+                Text(loc.t(.inputDevices))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                 Spacer()
-                Text("All")
+                Text(loc.t(.allToggle))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 customAllToggle
@@ -215,7 +220,7 @@ struct MenuBarPopoverView: View {
                 .foregroundStyle(device.isControllable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
 
             if device.isDefaultInput {
-                Text("default")
+                Text(loc.t(.badgeDefault))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
@@ -224,7 +229,7 @@ struct MenuBarPopoverView: View {
             }
 
             if !device.isControllable {
-                Text("no control")
+                Text(loc.t(.badgeNoControl))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 6)

@@ -17,6 +17,7 @@ struct HotkeyRecorderView: View {
 
     @State private var isRecording = false
     @State private var monitor: Any?
+    @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
@@ -26,7 +27,7 @@ struct HotkeyRecorderView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "keyboard")
                         .foregroundStyle(.secondary)
-                    Text(isRecording ? "Press a hotkey…" : binding.displayString)
+                    Text(isRecording ? loc.t(.pressHotkey) : binding.displayString)
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(isRecording ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                     Spacer(minLength: 0)
@@ -58,7 +59,7 @@ struct HotkeyRecorderView: View {
             if let conflict = binding.systemConflict {
                 HStack(spacing: 4) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                    Text("May conflict with \(conflict)")
+                    Text("\(loc.t(.conflictPrefix)) \(conflict)")
                 }
                 .font(.caption)
                 .foregroundStyle(.orange)
