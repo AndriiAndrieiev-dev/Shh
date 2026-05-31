@@ -24,7 +24,13 @@ struct PreferencesView: View {
             hotkeySection
             hudSection
             indicatorSection
-            popoverSection
+            // The popover transparency slider only matters on macOS 26+, where
+            // the Liquid-Glass material levels are visually distinct. On older
+            // systems the materials look nearly identical, so we hide the
+            // section to avoid a control that does nothing.
+            if #available(macOS 26, *) {
+                popoverSection
+            }
             languageSection
             permissionsSection
         }
