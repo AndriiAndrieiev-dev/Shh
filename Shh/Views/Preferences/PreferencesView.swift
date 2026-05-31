@@ -19,11 +19,12 @@ struct PreferencesView: View {
             generalSection
             hotkeySection
             hudSection
+            indicatorSection
             popoverSection
             permissionsSection
         }
         .formStyle(.grouped)
-        .frame(width: 540, height: 820)
+        .frame(width: 540, height: 900)
         // Live HUD preview when the user adjusts any HUD-layout option, so
         // they can see the effect without having to toggle mute themselves.
         .onChange(of: preferences.hudHorizontalAlignment) { _, _ in showHUDPreview() }
@@ -102,13 +103,11 @@ struct PreferencesView: View {
         Section {
             Toggle("Launch at login", isOn: $launchAtLogin.isEnabled)
 
-            Toggle("Auto-mute when the Mac sleeps", isOn: $preferences.autoMuteOnSleep)
-
             Toggle("Play sound on mute change", isOn: $preferences.playSoundFeedback)
         } header: {
             Text("General")
         } footer: {
-            Text("Sleep mute fires only if the mic is live and gets reversed on wake — manual mutes from before sleep are preserved. The sound feedback plays a short system tone (Pop for mute, Tink for unmute) so you can tell by ear when the HUD is hidden.")
+            Text("The sound feedback plays a short system tone (Pop for mute, Tink for unmute) so you can tell by ear when the HUD is hidden.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -196,6 +195,28 @@ struct PreferencesView: View {
         case ..<0.6: return "Regular"
         case ..<0.8: return "Thick"
         default:     return "Ultra thick"
+        }
+    }
+
+    // MARK: - Persistent mic indicator
+
+    private var indicatorSection: some View {
+        Section {
+            Toggle("Show persistent mic indicator", isOn: $preferences.showPersistentIndicator)
+
+            Picker("Corner", selection: $preferences.persistentIndicatorCorner) {
+                ForEach(ScreenCorner.allCases) { corner in
+                    Text(corner.displayName).tag(corner)
+                }
+            }
+            .pickerStyle(.menu)
+            .disabled(!preferences.showPersistentIndicator)
+        } header: {
+            Text("Persistent indicator")
+        } footer: {
+            Text("A small red mic badge stays in the chosen corner of the main display whenever any selected mic is muted — visible over fullscreen apps and across Spaces.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

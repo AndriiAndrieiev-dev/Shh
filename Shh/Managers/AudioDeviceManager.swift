@@ -68,17 +68,32 @@ final class AudioDeviceManager: ObservableObject {
     }
 
     /// Re-enumerate input devices (hot-plug). Preserves intent-based mute state
-    /// for already-known devices — only reads CoreAudio state for newly-seen
-    /// devices. Otherwise a manual Refresh would inconsistently "un-mute"
-    /// virtual devices like Teams Audio whose drivers reset the property
-    /// behind our back (see comment on `setMutedAll`).
+    /// for already-known devices.
+    ///
+    /// For *newly-seen* devices: if the current aggregate selection is muted,
+    /// the new device inherits that muted state (we actively mute it) rather
+    /// than picking up its hardware-default unmuted state. Rationale: if the
+    /// user has Shh… set to muted and then plugs in headphones, the headset
+    /// mic should also start muted — otherwise the aggregate flips to "live"
+    /// and the user surprise-unmutes everything just by connecting a device.
     func refresh() {
+        let wasAggregateMuted = isActiveSelectionMuted
         let newDevices = enumerateInputDevices()
         var states = muteStates
+        var newlyAddedControllable: [AudioDevice] = []
 
-        // Read initial mute state only for devices we haven't seen before.
         for device in newDevices where states[device.uid] == nil {
-            states[device.uid] = readMuteState(device: device)
+            if device.isControllable && wasAggregateMuted {
+                // Inherit the muted aggregate — defer the actual write until
+                // after we've updated `inputDevices` so `activeDevices`
+                // resolves the new device into scope.
+                states[device.uid] = true
+                newlyAddedControllable.append(device)
+            } else {
+                // Default: read hardware state (an unmuted headset just
+                // plugged in stays unmuted, matching reality).
+                states[device.uid] = readMuteState(device: device)
+            }
         }
 
         // Drop entries for devices that disappeared (unplugged).
@@ -87,7 +102,13 @@ final class AudioDeviceManager: ObservableObject {
 
         inputDevices = newDevices
         muteStates = states
-        log.debug("Refresh → \(self.inputDevices.count) input devices")
+
+        // Now actually apply the inherited mute state to the new hardware.
+        for device in newlyAddedControllable {
+            applyMute(true, to: device)
+        }
+
+        log.debug("Refresh → \(self.inputDevices.count) input devices; \(newlyAddedControllable.count) inherited muted state")
     }
 
 

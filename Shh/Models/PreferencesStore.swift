@@ -26,11 +26,12 @@ final class PreferencesStore: ObservableObject {
         static let hudHorizontalAlignment = "hudHorizontalAlignment"
         static let hudVerticalAlignment = "hudVerticalAlignment"
         static let hudSize = "hudSize"
-        static let autoMuteOnSleep = "autoMuteOnSleep"
         static let useAllDevices = "useAllDevices"
         static let selectedDeviceUIDs = "selectedDeviceUIDs"
         static let playSoundFeedback = "playSoundFeedback"
         static let firstLaunchCompleted = "firstLaunchCompleted"
+        static let showPersistentIndicator = "showPersistentIndicator"
+        static let persistentIndicatorCorner = "persistentIndicatorCorner"
     }
 
     /// Popover background tint level in [0, 1].
@@ -93,14 +94,6 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
-    /// Mute every controllable input device when the Mac is about to sleep.
-    /// On wake we deliberately do NOT auto-unmute — the user stays in control.
-    @Published var autoMuteOnSleep: Bool {
-        didSet {
-            UserDefaults.standard.set(autoMuteOnSleep, forKey: Key.autoMuteOnSleep)
-        }
-    }
-
     /// When true (default), mute actions apply to every controllable input
     /// device. When false, only devices whose UID is in `selectedDeviceUIDs`.
     @Published var useAllDevices: Bool {
@@ -129,6 +122,21 @@ final class PreferencesStore: ObservableObject {
     @Published var firstLaunchCompleted: Bool {
         didSet {
             UserDefaults.standard.set(firstLaunchCompleted, forKey: Key.firstLaunchCompleted)
+        }
+    }
+
+    /// Show a small persistent floating badge in a corner of the screen
+    /// while any active-selection device is muted.
+    @Published var showPersistentIndicator: Bool {
+        didSet {
+            UserDefaults.standard.set(showPersistentIndicator, forKey: Key.showPersistentIndicator)
+        }
+    }
+
+    /// Which corner the persistent indicator anchors to on the main display.
+    @Published var persistentIndicatorCorner: ScreenCorner {
+        didSet {
+            UserDefaults.standard.set(persistentIndicatorCorner.rawValue, forKey: Key.persistentIndicatorCorner)
         }
     }
 
@@ -176,7 +184,6 @@ final class PreferencesStore: ObservableObject {
             self.hudSize = .medium
         }
 
-        self.autoMuteOnSleep = UserDefaults.standard.object(forKey: Key.autoMuteOnSleep) as? Bool ?? true
         self.useAllDevices = UserDefaults.standard.object(forKey: Key.useAllDevices) as? Bool ?? true
         if let stored = UserDefaults.standard.array(forKey: Key.selectedDeviceUIDs) as? [String] {
             self.selectedDeviceUIDs = Set(stored)
@@ -185,5 +192,12 @@ final class PreferencesStore: ObservableObject {
         }
         self.playSoundFeedback = UserDefaults.standard.object(forKey: Key.playSoundFeedback) as? Bool ?? false
         self.firstLaunchCompleted = UserDefaults.standard.object(forKey: Key.firstLaunchCompleted) as? Bool ?? false
+        self.showPersistentIndicator = UserDefaults.standard.object(forKey: Key.showPersistentIndicator) as? Bool ?? false
+        if let raw = UserDefaults.standard.string(forKey: Key.persistentIndicatorCorner),
+           let corner = ScreenCorner(rawValue: raw) {
+            self.persistentIndicatorCorner = corner
+        } else {
+            self.persistentIndicatorCorner = .topRight
+        }
     }
 }

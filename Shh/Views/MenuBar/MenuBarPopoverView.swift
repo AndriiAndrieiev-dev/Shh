@@ -139,6 +139,30 @@ struct MenuBarPopoverView: View {
             : AnyShapeStyle(.secondary)
     }
 
+    /// SwiftUI's native `Toggle(.switch)` on macOS 26 Liquid Glass ignores
+    /// `.tint` / `SwitchToggleStyle(tint:)` — the switch always renders in
+    /// the system grey. We need a visibly-blue "ON" state for the All
+    /// switch, so we draw it ourselves with a Capsule + sliding knob.
+    private var customAllToggle: some View {
+        Button {
+            preferences.useAllDevices.toggle()
+        } label: {
+            ZStack(alignment: preferences.useAllDevices ? .trailing : .leading) {
+                Capsule()
+                    .fill(preferences.useAllDevices ? Color.accentColor : Color.gray.opacity(0.35))
+                    .frame(width: 30, height: 16)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 12, height: 12)
+                    .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
+                    .padding(.horizontal, 2)
+            }
+            .animation(.easeInOut(duration: 0.15), value: preferences.useAllDevices)
+        }
+        .buttonStyle(.plain)
+        .help(preferences.useAllDevices ? "Switch to per-device selection" : "Apply to all controllable devices")
+    }
+
     private var deviceList: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -147,9 +171,10 @@ struct MenuBarPopoverView: View {
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                 Spacer()
-                Toggle("All", isOn: $preferences.useAllDevices)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
+                Text("All")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                customAllToggle
             }
 
             ForEach(audio.inputDevices) { device in
