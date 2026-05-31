@@ -1,6 +1,6 @@
 # Shh… — Mute Your Mic on macOS with a Global Hotkey
 
-**Shh…** is a lightweight, native **macOS menu-bar app that mutes and unmutes your microphone with a single global hotkey** — from anywhere, in any app. Apple Silicon native, no Rosetta, built for **macOS Tahoe 26** with a Liquid-Glass UI.
+**Shh…** is a lightweight, native **macOS menu-bar app that mutes and unmutes your microphone with a single global hotkey** — from anywhere, in any app. Apple Silicon native, no Rosetta. Runs on **macOS 14 Sonoma and later**, with a Liquid-Glass UI on **macOS 26 Tahoe**.
 
 It's a modern, open-source alternative to **MuteKey**, which is x86_64-only and stops working once Rosetta is removed.
 
@@ -38,7 +38,8 @@ See **[how-to-install.md](how-to-install.md)** for step-by-step setup (the app i
 
 ## Requirements
 
-- macOS 26 Tahoe (Apple Silicon, arm64)
+- macOS 14 Sonoma or later (Apple Silicon, arm64)
+- The full Liquid-Glass look requires macOS 26 Tahoe; on 14/15 surfaces fall back to a standard blur.
 
 ## Installation
 
