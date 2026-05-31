@@ -10,7 +10,17 @@ It's a modern, open-source alternative to **MuteKey**, which is x86_64-only and 
 
 See **[how-to-install.md](how-to-install.md)** for step-by-step setup (the app is unsigned, so there's a one-time Gatekeeper step).
 
-<!-- TODO: add screenshots — drop PNGs in docs/screenshots/ and reference them here for the GitHub page and Google image results. -->
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/shh-popover.png" alt="Shh… menu-bar popover showing microphone status and per-device mute selection on macOS" width="300">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/shh-preferences-1.png" alt="Shh… Preferences: launch at login, global hotkey, push-to-talk mode and HUD overlay options on macOS" width="420">
+  &nbsp;
+  <img src="docs/screenshots/shh-preferences-2.png" alt="Shh… Preferences: persistent mic indicator, popover appearance, interface language and permission status on macOS" width="420">
+</p>
 
 ---
 
