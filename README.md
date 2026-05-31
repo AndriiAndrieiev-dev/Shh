@@ -14,6 +14,8 @@ See **[how-to-install.md](how-to-install.md)** for step-by-step setup (the app i
 
 <p align="center">
   <img src="docs/screenshots/shh-popover.png" alt="Shh… menu-bar popover showing microphone status and per-device mute selection on macOS" width="300">
+  &nbsp;
+  <img src="docs/screenshots/shh-hud.png" alt="Shh… floating HUD overlay confirming the microphone is muted on macOS" width="220">
 </p>
 
 <p align="center">
