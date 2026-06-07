@@ -17,6 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var cancellables = Set<AnyCancellable>()
 
+    /// Last aggregate mute state we acted on, so HUD/sound fire only on a real
+    /// flip and not on every `muteStates` republish from device hot-plug churn.
+    private var lastAggregateMuted: Bool?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController = MenuBarController()
 
@@ -109,21 +113,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
     }
 
-    /// React to every mute state change: HUD (timed or sticky), plus the
-    /// optional sound feedback. Drops the initial emission so nothing fires
-    /// at launch.
+    /// React to mute state changes: HUD (timed or sticky), plus the optional
+    /// sound feedback. Drops the initial emission so nothing fires at launch.
+    ///
+    /// `muteStates` is republished on every `refresh()` — including device
+    /// hot-plug churn (a Continuity iPhone or Bluetooth headset coming and
+    /// going) that doesn't actually change whether we're muted. We therefore
+    /// only flash the HUD and play the sound when the *aggregate* mute state
+    /// genuinely flips; otherwise the user hears phantom Pop/Tink tones at
+    /// random while devices re-enumerate. The sticky-HUD reconcile still runs
+    /// every time so it tracks device changes.
     private func observeMuteForHUD() {
         AudioDeviceManager.shared.$muteStates
             .receive(on: DispatchQueue.main)
             .dropFirst()
-            .sink { _ in
-                Self.refreshHUD(timedOnMuteChange: true)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let muted = AudioDeviceManager.shared.isActiveSelectionMuted
+                let changed = self.lastAggregateMuted != muted
+                self.lastAggregateMuted = muted
 
-                if PreferencesStore.shared.playSoundFeedback {
-                    // Two different sounds so the user can tell mute vs unmute
-                    // by ear alone — useful when the HUD is hidden or behind a
-                    // fullscreen app.
-                    let muted = AudioDeviceManager.shared.isActiveSelectionMuted
+                // Reconcile HUD on every publish (sticky needs it), but only
+                // allow the timed flash on a real state change.
+                Self.refreshHUD(timedOnMuteChange: changed)
+
+                if changed && PreferencesStore.shared.playSoundFeedback {
                     let soundName: NSSound.Name = muted ? "Pop" : "Tink"
                     NSSound(named: soundName)?.play()
                 }
