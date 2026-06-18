@@ -40,6 +40,15 @@ final class AudioDeviceManager: ObservableObject {
     /// holds a weak reference).
     private var deviceListListener: AudioObjectPropertyListenerBlock?
 
+    /// Per-device mute-property listeners, keyed by AudioDeviceID. Detect when
+    /// another app (e.g. Microsoft Teams on call start/end) changes a device's
+    /// mute behind our back, so we can re-enforce the user's intent.
+    private var muteListeners: [AudioDeviceID: AudioObjectPropertyListenerBlock] = [:]
+
+    /// Guards against reacting to our own mute writes (which also fire the
+    /// listener). Set while `applyMute` runs.
+    private var isApplyingMute = false
+
     private init() {
         refresh()
         installDeviceListChangeListener()
@@ -111,6 +120,10 @@ final class AudioDeviceManager: ObservableObject {
             applyMute(true, to: device)
         }
 
+        // (Re)install per-device mute listeners for the current device set so
+        // we notice external mute changes (e.g. Teams unmuting on call start).
+        installMuteListeners(for: newDevices)
+
         log.debug("Refresh → \(self.inputDevices.count) input devices; \(newlyAddedControllable.count) inherited muted state")
     }
 
@@ -173,6 +186,80 @@ final class AudioDeviceManager: ObservableObject {
         } else {
             log.info("Device-list hot-plug listener installed")
         }
+    }
+
+    // MARK: - Per-device mute listeners (external-change enforcement)
+
+    /// Install a `kAudioDevicePropertyMute` (input scope) listener on each
+    /// controllable device, removing any stale ones first. Fires when another
+    /// process changes the device's mute state.
+    private func installMuteListeners(for devices: [AudioDevice]) {
+        removeAllMuteListeners()
+        for device in devices where device.isControllable {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyMute,
+                mScope: kAudioObjectPropertyScopeInput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            guard AudioObjectHasProperty(device.id, &address) else { continue }
+
+            let deviceID = device.id
+            let listener: AudioObjectPropertyListenerBlock = { _, _ in
+                Task { @MainActor in
+                    AudioDeviceManager.shared.handleExternalMuteChange(deviceID: deviceID)
+                }
+            }
+            let status = AudioObjectAddPropertyListenerBlock(
+                device.id, &address, DispatchQueue.main, listener
+            )
+            if status == noErr {
+                muteListeners[device.id] = listener
+            } else {
+                log.error("Failed to add mute listener for device \(device.id): \(status)")
+            }
+        }
+    }
+
+    private func removeAllMuteListeners() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        for (deviceID, listener) in muteListeners {
+            AudioObjectRemovePropertyListenerBlock(deviceID, &address, DispatchQueue.main, listener)
+        }
+        muteListeners.removeAll()
+    }
+
+    /// React to an external mute change on a device.
+    ///
+    /// Enforcement policy: while Shh's intent for a device is *muted*, any
+    /// external attempt to unmute it (e.g. Microsoft Teams unmuting the mic
+    /// when a call starts) is rolled back — the device is re-muted. This keeps
+    /// "I muted it, so it stays muted" true until the user unmutes via Shh.
+    /// When our intent is *unmuted*, we simply sync our state to reality so the
+    /// UI never lies.
+    private func handleExternalMuteChange(deviceID: AudioDeviceID) {
+        // Ignore the listener firing as a side effect of our own write.
+        guard !isApplyingMute else { return }
+        guard let device = inputDevices.first(where: { $0.id == deviceID }) else { return }
+
+        let realMuted = readMuteState(device: device)
+        let intendedMuted = muteStates[device.uid] == true
+
+        if intendedMuted && !realMuted {
+            // External unmute while we intend muted → re-enforce.
+            log.info("External unmute on '\(device.name, privacy: .public)' — re-enforcing mute")
+            applyMute(true, to: device)
+            // muteStates already true; nudge a publish so observers re-run.
+            muteStates = muteStates
+        } else if !intendedMuted && realMuted {
+            // External mute while we intend live → reflect reality.
+            log.info("External mute on '\(device.name, privacy: .public)' — syncing state")
+            muteStates[device.uid] = true
+        }
+        // Matching states → nothing to do.
     }
 
     // MARK: - CoreAudio: enumerate input devices
@@ -374,6 +461,10 @@ final class AudioDeviceManager: ObservableObject {
     }
 
     private func applyMute(_ muted: Bool, to device: AudioDevice) {
+        // Suppress our own mute-listener callback for the duration of the write.
+        isApplyingMute = true
+        defer { isApplyingMute = false }
+
         log.info("applyMute(muted=\(muted)) → '\(device.name, privacy: .public)' id=\(device.id) uid=\(device.uid, privacy: .public)")
 
         let preMute = readMuteProperty(deviceID: device.id)
