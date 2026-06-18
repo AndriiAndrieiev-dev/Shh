@@ -30,7 +30,7 @@ targets:
       path: Shh/Info.plist
       properties:
         CFBundleDisplayName: "Shh…"
-        CFBundleShortVersionString: "0.2.0"
+        CFBundleShortVersionString: "0.1.1"
         CFBundleVersion: "2"
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"
